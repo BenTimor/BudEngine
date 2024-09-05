@@ -3,10 +3,12 @@ import { IParser, OperationNode, OperationParserConstructor } from "./types";
 
 type Options = {
     split: RegExp;
+    skipEmpty?: boolean;
 };
 
 const DefaultOptions: Options = {
     split: /\s+/g,
+    skipEmpty: true,
 };
 
 
@@ -41,13 +43,18 @@ export class Parser<Values> implements IParser<Values> {
         let i = 0;
 
         while (i < tokens.length) {
+            if (this.options.skipEmpty && !tokens[i]) {
+                i++;
+                continue;
+            }
+
             const node = this.parseNext(tokens, i);
 
             if (!node) {
                 throw new Error("Syntax error");
             }
 
-            if (!node.endsAt) {
+            if (node.endsAt === undefined) {
                 throw new Error("Syntax error");
             }
 
