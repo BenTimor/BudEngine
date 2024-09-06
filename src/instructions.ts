@@ -1,7 +1,10 @@
 import { IInstructionParser, IASTBuilder, InstructionNode } from "./types";
 
 export abstract class InstructionParser<Instructions> implements IInstructionParser<Instructions> {
-    public nextIndex: number;
+    abstract instruction: Instructions;
+    limited: boolean = false;
+    nextIndex: number;
+    limitNext: Instructions[] | undefined;
 
     constructor(protected tokens: string[], protected startAt: number, protected astBuilder: IASTBuilder<Instructions>) {
         this.nextIndex = startAt;
@@ -15,8 +18,12 @@ export abstract class InstructionParser<Instructions> implements IInstructionPar
         this.nextIndex = this.startAt;
     }
 
+    clearLimitNext() {
+        this.limitNext = undefined;
+    }
+
     protected next(): InstructionNode<Instructions> | undefined {
-        const on = this.astBuilder.fromToken(this.tokens, this.nextIndex + 1);
+        const on = this.astBuilder.fromToken(this.tokens, this.nextIndex + 1, this.limitNext);
 
         if (!on) {
             return;
