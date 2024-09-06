@@ -1,6 +1,7 @@
 export interface IASTBuilder<Instructions, Injection> {
     fromToken(tokens: string[], startAt: number, inject: Injection, limit?: Instructions[]): InstructionNode<Instructions> | undefined;
     fromContent(content: string): InstructionNode<Instructions>[];
+    getNode(identifier: string): InstructionNode<Instructions> | undefined;
 }
 
 export interface IInstructionParser<Instructions> {

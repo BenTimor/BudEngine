@@ -14,9 +14,14 @@ const DefaultOptions: Options = {
 
 export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instructions, Injection> {
     private options: Options;
+    private nodesIndex: Record<string, InstructionNode<Instructions>> = {};
 
     constructor(private instructions: (InstructionParserConstructor<any /* I don't like the "any" here, but it requires some thought */, Injection>)[], private inject: Injection, options?: Partial<Options>) {
         this.options = defaultsDeep(options || {}, DefaultOptions);
+    }
+
+    getNode(identifier: string): InstructionNode<Instructions> | undefined {
+        return this.nodesIndex[identifier];
     }
 
     fromToken(tokens: string[], startAt: number, inject: Injection, limit?: Instructions[]): InstructionNode<Instructions> | undefined {
@@ -33,9 +38,18 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
 
             if (instructionInstance.check()) {
                 instructionInstance.resetNextIndex();
+                instructionInstance.clearLimitNext();
                 const node = instructionInstance.handle();
 
                 node.endsAt = instructionInstance.nextIndex;
+
+                if (node.identifier) {
+                    if (this.nodesIndex[node.identifier]) {
+                        throw new Error(`Node with identifier ${node.identifier} already exists`);
+                    }
+
+                    this.nodesIndex[node.identifier] = node;
+                }
 
                 return node;
             }
