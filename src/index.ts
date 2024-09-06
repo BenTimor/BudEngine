@@ -1,3 +1,3 @@
-export { Parser } from "./parser";
-export { OperationParser } from "./operations";
+export { ASTBuilder } from "./parser";
+export { InstructionParser } from "./instructions";
 export * from "./types";

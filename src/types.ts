@@ -1,22 +1,22 @@
-export interface IParser<Values> {
-    parseNext(tokens: string[], startAt: number): OperationNode<Values> | undefined;
-    parseContent(content: string): OperationNode<Values>[];
+export interface IASTBuilder<Instructions> {
+    fromToken(tokens: string[], startAt: number): InstructionNode<Instructions> | undefined;
+    fromContent(content: string): InstructionNode<Instructions>[];
 }
 
-export interface IOperationParser<Values> {
+export interface IInstructionParser<Instructions> {
     nextIndex: number;
     arg: string;
     resetNextIndex(): void;
     check(): boolean;
-    handle(): OperationNode<Values>;
+    handle(): InstructionNode<Instructions>;
 }
 
-export type OperationParserConstructor<Values> = new (tokens: string[], startAt: number, parser: IParser<Values>) => IOperationParser<Values>;
+export type InstructionParserConstructor<Instructions> = new (tokens: string[], startAt: number, astBuilder: IASTBuilder<Instructions>) => IInstructionParser<Instructions>;
 
-export type OperationNode<Values, Context = Record<any, any>> = {
-    children: OperationNode<Values>[];
+export type InstructionNode<Instructions, Context = Record<any, any>> = {
+    children: InstructionNode<Instructions>[];
     identifier?: string;
     context?: Context;
     endsAt?: number;
-    value: Values;
+    value: Instructions;
 };

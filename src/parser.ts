@@ -1,5 +1,5 @@
 import { defaultsDeep } from "lodash";
-import { IParser, OperationNode, OperationParserConstructor } from "./types";
+import { IASTBuilder, InstructionNode, InstructionParserConstructor } from "./types";
 
 type Options = {
     split: RegExp;
@@ -12,23 +12,23 @@ const DefaultOptions: Options = {
 };
 
 
-export class Parser<Values> implements IParser<Values> {
+export class ASTBuilder<Instructions> implements IASTBuilder<Instructions> {
     private options: Options;
 
-    constructor(private operations: (OperationParserConstructor<Values>)[], options?: Partial<Options>) {
+    constructor(private instructions: (InstructionParserConstructor<Instructions>)[], options?: Partial<Options>) {
         this.options = defaultsDeep(options || {}, DefaultOptions);
     }
 
-    parseNext(tokens: string[], startAt: number): OperationNode<Values> | undefined {
+    fromToken(tokens: string[], startAt: number): InstructionNode<Instructions> | undefined {
         for (let i = startAt; i < tokens.length; i++) {
-            for (const operation of this.operations) {
-                const instance = new operation(tokens, i, this);
+            for (const instructionConstructor of this.instructions) {
+                const instructionInstance = new instructionConstructor(tokens, i, this);
 
-                if (instance.check()) {
-                    instance.resetNextIndex();
-                    const node = instance.handle();
+                if (instructionInstance.check()) {
+                    instructionInstance.resetNextIndex();
+                    const node = instructionInstance.handle();
 
-                    node.endsAt = instance.nextIndex;
+                    node.endsAt = instructionInstance.nextIndex;
 
                     return node;
                 }
@@ -36,8 +36,8 @@ export class Parser<Values> implements IParser<Values> {
         }
     }
 
-    parseContent(content: string): OperationNode<Values>[] {
-        const nodes: OperationNode<Values>[] = [];
+    fromContent(content: string): InstructionNode<Instructions>[] {
+        const nodes: InstructionNode<Instructions>[] = [];
         const tokens = content.split(this.options.split);
 
         let i = 0;
@@ -48,7 +48,7 @@ export class Parser<Values> implements IParser<Values> {
                 continue;
             }
 
-            const node = this.parseNext(tokens, i);
+            const node = this.fromToken(tokens, i);
 
             if (!node) {
                 throw new Error("Syntax error");
