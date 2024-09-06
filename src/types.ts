@@ -21,5 +21,5 @@ export type InstructionNode<Instructions, Context = Record<any, any>> = {
     identifier?: string;
     context?: Context;
     endsAt?: number;
-    value: Instructions;
+    instruction: Instructions;
 };
