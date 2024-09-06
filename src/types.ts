@@ -1,5 +1,5 @@
-export interface IASTBuilder<Instructions> {
-    fromToken(tokens: string[], startAt: number, limit?: Instructions[]): InstructionNode<Instructions> | undefined;
+export interface IASTBuilder<Instructions, Injection> {
+    fromToken(tokens: string[], startAt: number, inject: Injection, limit?: Instructions[]): InstructionNode<Instructions> | undefined;
     fromContent(content: string): InstructionNode<Instructions>[];
 }
 
@@ -15,7 +15,7 @@ export interface IInstructionParser<Instructions> {
     clearLimitNext(): void;
 }
 
-export type InstructionParserConstructor<Instructions> = new (tokens: string[], startAt: number, astBuilder: IASTBuilder<Instructions>) => IInstructionParser<Instructions>;
+export type InstructionParserConstructor<Instructions, Injection> = new (tokens: string[], startAt: number, astBuilder: IASTBuilder<Instructions, Injection>, injection: Injection) => IInstructionParser<Instructions>;
 
 export type InstructionNode<Instructions, Context = Record<any, any>> = {
     identifier?: string;

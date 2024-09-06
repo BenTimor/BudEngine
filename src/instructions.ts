@@ -1,12 +1,12 @@
 import { IInstructionParser, IASTBuilder, InstructionNode } from "./types";
 
-export abstract class InstructionParser<Instructions> implements IInstructionParser<Instructions> {
+export abstract class InstructionParser<Instructions, Injection> implements IInstructionParser<Instructions> {
     abstract instruction: Instructions;
     limited: boolean = false;
     nextIndex: number;
     limitNext: Instructions[] | undefined;
 
-    constructor(protected tokens: string[], protected startAt: number, protected astBuilder: IASTBuilder<Instructions>) {
+    constructor(protected tokens: string[], protected startAt: number, protected astBuilder: IASTBuilder<Instructions, Injection>, protected injection: Injection) {
         this.nextIndex = startAt;
     }
 
@@ -23,7 +23,7 @@ export abstract class InstructionParser<Instructions> implements IInstructionPar
     }
 
     protected next(): InstructionNode<Instructions> | undefined {
-        const on = this.astBuilder.fromToken(this.tokens, this.nextIndex + 1, this.limitNext);
+        const on = this.astBuilder.fromToken(this.tokens, this.nextIndex + 1, this.injection, this.limitNext);
 
         if (!on) {
             return;

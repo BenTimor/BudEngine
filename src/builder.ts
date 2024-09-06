@@ -12,17 +12,17 @@ const DefaultOptions: Options = {
 };
 
 
-export class ASTBuilder<Instructions> implements IASTBuilder<Instructions> {
+export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instructions, Injection> {
     private options: Options;
 
-    constructor(private instructions: (InstructionParserConstructor<any /* I don't like the "any" here, but it requires some thought */>)[], options?: Partial<Options>) {
+    constructor(private instructions: (InstructionParserConstructor<any /* I don't like the "any" here, but it requires some thought */, Injection>)[], private inject: Injection, options?: Partial<Options>) {
         this.options = defaultsDeep(options || {}, DefaultOptions);
     }
 
-    fromToken(tokens: string[], startAt: number, limit?: Instructions[]): InstructionNode<Instructions> | undefined {
+    fromToken(tokens: string[], startAt: number, inject: Injection, limit?: Instructions[]): InstructionNode<Instructions> | undefined {
         for (let i = startAt; i < tokens.length; i++) {
             for (const instructionConstructor of this.instructions) {
-                const instructionInstance = new instructionConstructor(tokens, i, this);
+                const instructionInstance = new instructionConstructor(tokens, i, this, inject);
 
                 if (limit && !limit.includes(instructionInstance.instruction)) {
                     continue;
@@ -56,7 +56,7 @@ export class ASTBuilder<Instructions> implements IASTBuilder<Instructions> {
                 continue;
             }
 
-            const node = this.fromToken(tokens, i);
+            const node = this.fromToken(tokens, i, this.inject);
 
             if (!node) {
                 throw new Error("Syntax error");
