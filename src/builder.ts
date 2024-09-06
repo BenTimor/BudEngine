@@ -20,26 +20,24 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
     }
 
     fromToken(tokens: string[], startAt: number, inject: Injection, limit?: Instructions[]): InstructionNode<Instructions> | undefined {
-        for (let i = startAt; i < tokens.length; i++) {
-            for (const instructionConstructor of this.instructions) {
-                const instructionInstance = new instructionConstructor(tokens, i, this, inject);
+        for (const instructionConstructor of this.instructions) {
+            const instructionInstance = new instructionConstructor(tokens, startAt, this, inject);
 
-                if (limit && !limit.includes(instructionInstance.instruction)) {
-                    continue;
-                }
+            if (limit && !limit.includes(instructionInstance.instruction)) {
+                continue;
+            }
 
-                if (!limit && instructionInstance.limited) {
-                    continue;
-                }
+            if (!limit && instructionInstance.limited) {
+                continue;
+            }
 
-                if (instructionInstance.check()) {
-                    instructionInstance.resetNextIndex();
-                    const node = instructionInstance.handle();
+            if (instructionInstance.check()) {
+                instructionInstance.resetNextIndex();
+                const node = instructionInstance.handle();
 
-                    node.endsAt = instructionInstance.nextIndex;
+                node.endsAt = instructionInstance.nextIndex;
 
-                    return node;
-                }
+                return node;
             }
         }
     }
