@@ -1,12 +1,11 @@
-import { IInstructionParser, IASTBuilder, InstructionNode } from "./types";
+import { IInstructionParser, IASTBuilder, InstructionNode, ReturnedInstructionNode } from "./types";
 
-export abstract class InstructionParser<Instructions, Injection> implements IInstructionParser<Instructions> {
+export abstract class InstructionParser<InternalInstructionNode extends InstructionNode<any, any>, Instructions, Injection> implements IInstructionParser<InternalInstructionNode, Instructions> {
     abstract instruction: Instructions;
     limited: boolean = false;
     nextIndex: number;
-    limitNext: Instructions[] | undefined;
 
-    constructor(protected tokens: string[], protected startAt: number, protected astBuilder: IASTBuilder<Instructions, Injection>, protected injection: Injection) {
+    constructor(protected tokens: string[], protected startAt: number, protected astBuilder: IASTBuilder<InternalInstructionNode, Instructions, Injection>, protected injection: Injection) {
         this.nextIndex = startAt;
     }
 
@@ -18,26 +17,27 @@ export abstract class InstructionParser<Instructions, Injection> implements IIns
         this.nextIndex = this.startAt;
     }
 
-    clearLimitNext() {
-        this.limitNext = undefined;
+    protected nextChildren(limitNext?: Instructions[], stopAt?: Instructions[]): InternalInstructionNode[] {
+        const children = this.astBuilder.createChildren(this.tokens, this.nextIndex + 1, this.injection, stopAt, limitNext);
+
+        if (children.length === 0) {
+            return [];
+        }
+
+        this.nextIndex = children[children.length - 1].endsAt;
+
+        return children;
     }
 
-    protected next(): InstructionNode<Instructions> | undefined {
-        const on = this.astBuilder.fromToken(this.tokens, this.nextIndex + 1, this.injection, this.limitNext);
-
-        if (!on) {
+    protected next(limitNext?: Instructions[]): InternalInstructionNode | undefined {
+        try {
+            return this.nextChildren(limitNext)[0]; // TODO Make sure we catch only "no children" error
+        }
+        catch {
             return;
         }
-
-        if (!on.endsAt) {
-            throw new Error("Syntax error");
-        }
-
-        this.nextIndex = on.endsAt;
-
-        return on;
     }
 
     abstract check(): boolean;
-    abstract handle(): InstructionNode<Instructions>;
+    abstract handle(): ReturnedInstructionNode<InternalInstructionNode>;
 }

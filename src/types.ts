@@ -1,26 +1,27 @@
-export interface IASTBuilder<Instructions, Injection> {
-    fromToken(tokens: string[], startAt: number, inject: Injection, limit?: Instructions[]): InstructionNode<Instructions> | undefined;
-    fromContent(content: string): InstructionNode<Instructions>[];
-    getNode(identifier: string): InstructionNode<Instructions> | undefined;
+export interface IASTBuilder<InternalInstructionNode extends InstructionNode<any, any>, Instructions, Injection> {
+    nodes: InternalInstructionNode[];
+    fromContent(content: string): InternalInstructionNode[];
+    getNode(identifier: string): InternalInstructionNode | undefined;
+    createChildren(tokens: string[], startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[]): InternalInstructionNode[];
 }
 
-export interface IInstructionParser<Instructions> {
+export interface IInstructionParser<InternalInstructionNode extends InstructionNode<any, any>, Instructions> {
     instruction: Instructions;
     limited: boolean;
     nextIndex: number;
-    limitNext: Instructions[] | undefined;
     arg: string;
     resetNextIndex(): void;
     check(): boolean;
-    handle(): InstructionNode<Instructions>;
-    clearLimitNext(): void;
+    handle(): ReturnedInstructionNode<InternalInstructionNode>;
 }
 
-export type InstructionParserConstructor<Instructions, Injection> = new (tokens: string[], startAt: number, astBuilder: IASTBuilder<Instructions, Injection>, injection: Injection) => IInstructionParser<Instructions>;
+export type InstructionParserConstructor<InternalInstructionNode extends InstructionNode<any, any>, Instructions, Injection> = new (tokens: string[], startAt: number, astBuilder: IASTBuilder<InternalInstructionNode, Instructions, Injection>, injection: Injection) => IInstructionParser<InternalInstructionNode, Instructions>;
 
-export type InstructionNode<Instructions, Context = Record<any, any>> = {
+export type InstructionNode<Instructions, Context = undefined> = {
     identifier?: string;
-    context?: Context;
-    endsAt?: number;
+    endsAt: number;
+    addToAST: boolean;
     instruction: Instructions;
-};
+} & (Context extends undefined ? {} : { context: Context });
+
+export type ReturnedInstructionNode<InternalInstructionNode extends InstructionNode<any, any>> = Omit<InternalInstructionNode, "addToAST" | "endsAt">;

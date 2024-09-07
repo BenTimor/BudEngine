@@ -1,5 +1,5 @@
 import { defaultsDeep } from "lodash";
-import { IASTBuilder, InstructionNode, InstructionParserConstructor } from "./types";
+import { IASTBuilder, InstructionNode, InstructionParserConstructor, ReturnedInstructionNode } from "./types";
 
 type Options = {
     split: RegExp;
@@ -12,19 +12,49 @@ const DefaultOptions: Options = {
 };
 
 
-export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instructions, Injection> {
+export class ASTBuilder<InternalInstructionNode extends InstructionNode<any, any>, Instructions, Injection> implements IASTBuilder<InternalInstructionNode, Instructions, Injection> {
     private options: Options;
-    private nodesIndex: Record<string, InstructionNode<Instructions>> = {};
+    private nodesIndex: Record<string, InternalInstructionNode> = {};
+    public nodes: InternalInstructionNode[] = [];
 
-    constructor(private instructions: (InstructionParserConstructor<any /* I don't like the "any" here, but it requires some thought */, Injection>)[], private inject: Injection, options?: Partial<Options>) {
+    constructor(private instructions: (InstructionParserConstructor<InternalInstructionNode, Instructions, Injection>)[], private inject: Injection, options?: Partial<Options>, private parent?: ASTBuilder<InternalInstructionNode, Instructions, Injection>) {
         this.options = defaultsDeep(options || {}, DefaultOptions);
     }
 
-    getNode(identifier: string): InstructionNode<Instructions> | undefined {
-        return this.nodesIndex[identifier];
+    getNode(identifier: string): InternalInstructionNode | undefined {
+        return this.nodesIndex[identifier] ?? this.parent?.getNode(identifier);
     }
 
-    fromToken(tokens: string[], startAt: number, inject: Injection, limit?: Instructions[]): InstructionNode<Instructions> | undefined {
+    createChildren(tokens: string[], startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[]): InternalInstructionNode[] {
+        const subASTBuilder = new ASTBuilder<InternalInstructionNode, Instructions, Injection>(this.instructions, inject, this.options, this);
+
+        let index = startAt;
+
+        while (true) {
+            const node = subASTBuilder.fromToken(tokens, index, inject, limit);
+
+            // No node and we didn't break yet? Then there's an error
+            if (!node) {                                
+                throw new Error("Syntax error");
+            }
+
+            index = node.endsAt + 1;
+
+            // If there's no stopAt the loop runs only once
+            if (!stopAt) {
+                break;
+            }
+
+            // If the node is in the stopAt array, we break
+            if (stopAt.includes(node.instruction)) {
+                break;
+            }
+        }
+
+        return subASTBuilder.nodes;
+    }
+
+    private fromToken(tokens: string[], startAt: number, inject: Injection, limit?: Instructions[]): InternalInstructionNode | undefined {
         for (const instructionConstructor of this.instructions) {
             const instructionInstance = new instructionConstructor(tokens, startAt, this, inject);
 
@@ -38,10 +68,13 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
 
             if (instructionInstance.check()) {
                 instructionInstance.resetNextIndex();
-                instructionInstance.clearLimitNext();
-                const node = instructionInstance.handle();
 
-                node.endsAt = instructionInstance.nextIndex;
+                const returnedNode = instructionInstance.handle() as any; // TODO I have no idea how to fix this type
+
+                const node: InternalInstructionNode = {
+                    ...returnedNode,
+                    endsAt: instructionInstance.nextIndex,
+                };
 
                 if (node.identifier) {
                     if (this.nodesIndex[node.identifier]) {
@@ -51,13 +84,14 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
                     this.nodesIndex[node.identifier] = node;
                 }
 
+                this.nodes.push(node);
+
                 return node;
             }
         }
     }
 
-    fromContent(content: string): InstructionNode<Instructions>[] {
-        const nodes: InstructionNode<Instructions>[] = [];
+    fromContent(content: string): InternalInstructionNode[] {
         const tokens = content.split(this.options.split);
 
         let i = 0;
@@ -79,10 +113,8 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
             }
 
             i = node.endsAt + 1;
-
-            nodes.push(node);
         }
 
-        return nodes;
+        return this.nodes;
     }
 }
