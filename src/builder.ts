@@ -31,7 +31,10 @@ export class ASTBuilder<InternalInstructionNode extends InstructionNode<any, any
         let index = startAt;
 
         while (true) {
-            const node = subASTBuilder.fromToken(tokens, index, inject, limit);
+            const node = subASTBuilder.fromToken(tokens, index, inject, limit, [
+                ...(limit || []),
+                ...(stopAt || []),
+            ]);
 
             // No node and we didn't break yet? Then there's an error
             if (!node) {                                
@@ -54,7 +57,7 @@ export class ASTBuilder<InternalInstructionNode extends InstructionNode<any, any
         return subASTBuilder.nodes;
     }
 
-    private fromToken(tokens: string[], startAt: number, inject: Injection, limit?: Instructions[]): InternalInstructionNode | undefined {
+    private fromToken(tokens: string[], startAt: number, inject: Injection, limit?: Instructions[], allowedInstructions: Instructions[] = []): InternalInstructionNode | undefined {
         for (const instructionConstructor of this.instructions) {
             const instructionInstance = new instructionConstructor(tokens, startAt, this, inject);
 
@@ -62,7 +65,7 @@ export class ASTBuilder<InternalInstructionNode extends InstructionNode<any, any
                 continue;
             }
 
-            if (!limit && instructionInstance.limited) {
+            if (instructionInstance.limited && !allowedInstructions.includes(instructionInstance.instruction)) {
                 continue;
             }
 
