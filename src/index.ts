@@ -1,3 +1,5 @@
 export { ASTBuilder } from "./builder";
-export { InstructionParser } from "./instructions";
+export { InstructionParser } from "./parser";
 export * from "./types";
+export * from "./generator";
+export * from "./utils";
