@@ -12,21 +12,21 @@ const DefaultOptions: Options = {
 };
 
 
-export class ASTBuilder<InternalInstructionNode extends InstructionNode<any, any>, Instructions, Injection> implements IASTBuilder<InternalInstructionNode, Instructions, Injection> {
+export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instructions, Injection> {
     private options: Options;
-    private nodesIndex: Record<string, InternalInstructionNode> = {};
-    public nodes: InternalInstructionNode[] = [];
+    private nodesIndex: Record<string, InstructionNode<Instructions, unknown>> = {};
+    public nodes: InstructionNode<Instructions, unknown>[] = [];
 
-    constructor(private instructions: (InstructionParserConstructor<InternalInstructionNode, Instructions, Injection>)[], private inject: Injection, options?: Partial<Options>, private parent?: ASTBuilder<InternalInstructionNode, Instructions, Injection>) {
+    constructor(private instructions: (InstructionParserConstructor<Instructions, any, Injection>)[], private inject: Injection, options?: Partial<Options>, private parent?: ASTBuilder<Instructions, Injection>) {
         this.options = defaultsDeep(options || {}, DefaultOptions);
     }
 
-    getNode(identifier: string): InternalInstructionNode | undefined {
+    getNode(identifier: string): InstructionNode<Instructions, unknown> | undefined {
         return this.nodesIndex[identifier] ?? this.parent?.getNode(identifier);
     }
 
-    createChildren(tokens: string[], startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[]): InternalInstructionNode[] {
-        const subASTBuilder = new ASTBuilder<InternalInstructionNode, Instructions, Injection>(this.instructions, inject, this.options, this);
+    createChildren(tokens: string[], startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[]): InstructionNode<Instructions, unknown>[] {
+        const subASTBuilder = new ASTBuilder<Instructions, Injection>(this.instructions, inject, this.options, this);
 
         let index = startAt;
 
@@ -57,9 +57,9 @@ export class ASTBuilder<InternalInstructionNode extends InstructionNode<any, any
         return subASTBuilder.nodes;
     }
 
-    private fromToken(tokens: string[], startAt: number, inject: Injection, limit?: Instructions[], allowedInstructions: Instructions[] = []): InternalInstructionNode | undefined {
+    private fromToken(tokens: string[], startAt: number, inject: Injection, limit?: Instructions[], allowedInstructions: Instructions[] = []): InstructionNode<Instructions, any> | undefined {
         for (const instructionConstructor of this.instructions) {
-            const instructionInstance = new instructionConstructor(tokens, startAt, this, inject);
+            const instructionInstance = new instructionConstructor(tokens, startAt, this as IASTBuilder<Instructions, Injection>, inject);
 
             if (limit && !limit.includes(instructionInstance.instruction)) {
                 continue;
@@ -74,7 +74,7 @@ export class ASTBuilder<InternalInstructionNode extends InstructionNode<any, any
 
                 const returnedNode = instructionInstance.handle() as any; // TODO I have no idea how to fix this type
 
-                const node: InternalInstructionNode = {
+                const node: InstructionNode<Instructions, unknown> = {
                     ...returnedNode,
                     endsAt: instructionInstance.nextIndex,
                 };
@@ -94,7 +94,7 @@ export class ASTBuilder<InternalInstructionNode extends InstructionNode<any, any
         }
     }
 
-    fromContent(content: string): InternalInstructionNode[] {
+    fromContent(content: string): InstructionNode<Instructions, unknown>[] {
         const tokens = content.split(this.options.split);
 
         let i = 0;
