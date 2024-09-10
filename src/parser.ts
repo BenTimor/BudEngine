@@ -5,7 +5,7 @@ export abstract class InstructionParser<Instructions, Context, Injection> implem
     limited: boolean = false;
     nextIndex: number;
 
-    constructor(protected tokens: string[], protected startAt: number, protected astBuilder: IASTBuilder<Instructions, Injection>, protected injection: Injection) {
+    constructor(protected tokens: string[], protected startAt: number, protected astBuilder: IASTBuilder<Instructions, Injection>, protected injection: Injection /* TODO Put injection in a proxy and allow to change it only by assignment to this.injection but without changing the internal fields individiaully */) {
         this.nextIndex = startAt;
     }
 
