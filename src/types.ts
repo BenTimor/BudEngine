@@ -9,13 +9,20 @@ export interface IInstructionParser<Instructions, Context> {
     instruction: Instructions;
     limited: boolean;
     nextIndex: number;
-    arg: string;
+    arg: string; // TODO Rename to token
     resetNextIndex(): void;
     check(): boolean;
     handle(): ReturnedInstructionNode<Instructions, Context>;
 }
 
+export interface IInstructionVisitor<Instructions> {
+    check(): boolean;
+    handle(): void;
+}
+
 export type InstructionParserConstructor<Instructions, Context, Injection> = new (tokens: string[], startAt: number, astBuilder: IASTBuilder<Instructions, Injection>, injection: Injection) => IInstructionParser<Instructions, Context>;
+
+export type InstructionVisitorConstructor<Instructions, Injection> = new (astBuilder: IASTBuilder<Instructions, Injection>, injection: Injection) => IInstructionVisitor<Instructions>;
 
 export type InstructionNode<Instructions, Context = undefined> = {
     identifier?: string;

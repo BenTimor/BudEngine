@@ -6,7 +6,7 @@ export interface GeneratorOptions {
 }
 
 const defaultOptions: GeneratorOptions = {
-    join: "\n"
+    join: ""
 };
 
 export class Generator implements IGenerator {

@@ -1,5 +1,5 @@
 import { defaultsDeep } from "lodash";
-import { IASTBuilder, InstructionNode, InstructionParserConstructor, ReturnedInstructionNode } from "./types";
+import { IASTBuilder, InstructionNode, InstructionParserConstructor, InstructionVisitorConstructor } from "./types";
 
 type Options = {
     split: RegExp;
@@ -17,7 +17,7 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
     private nodesIndex: Record<string, InstructionNode<Instructions, unknown>> = {};
     public nodes: InstructionNode<Instructions, unknown>[] = [];
 
-    constructor(private instructions: (InstructionParserConstructor<Instructions, any, Injection>)[], private inject: Injection, options?: Partial<Options>, private parent?: ASTBuilder<Instructions, Injection>) {
+    constructor(private instructions: (InstructionParserConstructor<Instructions, any, Injection>)[], private visitors: (InstructionVisitorConstructor<Instructions, Injection>)[], private inject: Injection, options?: Partial<Options>, private parent?: ASTBuilder<Instructions, Injection>) {
         this.options = defaultsDeep(options || {}, DefaultOptions);
     }
 
@@ -26,7 +26,7 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
     }
 
     createChildren(tokens: string[], startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[]): InstructionNode<Instructions, unknown>[] {
-        const subASTBuilder = new ASTBuilder<Instructions, Injection>(this.instructions, inject, this.options, this);
+        const subASTBuilder = new ASTBuilder<Instructions, Injection>(this.instructions, this.visitors, inject, this.options, this);
 
         let index = startAt;
 
@@ -55,6 +55,16 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
         }
 
         return subASTBuilder.nodes;
+    }
+    
+    private visit(): void {
+        for (const visitorConstructor of this.visitors) {
+            const visitor = new visitorConstructor(this as IASTBuilder<Instructions, Injection>, this.inject);
+
+            if (visitor.check()) {
+                visitor.handle();
+            }
+        }
     }
 
     private fromToken(tokens: string[], startAt: number, inject: Injection, limit?: Instructions[], allowedInstructions: Instructions[] = []): InstructionNode<Instructions, any> | undefined {
@@ -89,12 +99,14 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
 
                 this.nodes.push(node);
 
+                this.visit();
+
                 return node;
             }
         }
     }
 
-    fromContent(content: string): InstructionNode<Instructions, unknown>[] {
+    fromContent(content: string): InstructionNode<Instructions, unknown>[] {        
         const tokens = content.split(this.options.split);
 
         let i = 0;
