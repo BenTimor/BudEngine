@@ -1,6 +1,6 @@
 import { IASTBuilder, IInstructionVisitor } from "./types";
 
-export abstract class InstructionVisitor<Instructions, Injection> implements IInstructionVisitor<Instructions> {
+export abstract class InstructionVisitor<Instructions, Injection> implements IInstructionVisitor {
     constructor(protected astBuilder: IASTBuilder<Instructions, Injection>, protected injection: Injection) {}
 
     abstract check(): boolean;

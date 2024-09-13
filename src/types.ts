@@ -2,7 +2,7 @@ export interface IASTBuilder<Instructions, Injection> {
     nodes: InstructionNode<Instructions, unknown>[];
     fromContent(content: string): InstructionNode<Instructions, unknown>[];
     getNode(identifier: string): InstructionNode<Instructions, unknown> | undefined;
-    createChildren(tokens: string[], startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[]): InstructionNode<Instructions, unknown>[];
+    createChildren(content: string, tokens: string[], startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[]): InstructionNode<Instructions, unknown>[];
 }
 
 export interface IInstructionParser<Instructions, Context> {
@@ -13,16 +13,17 @@ export interface IInstructionParser<Instructions, Context> {
     resetNextIndex(): void;
     check(): boolean;
     handle(): ReturnedInstructionNode<Instructions, Context>;
+    trace(cords: [number, number]): string;
 }
 
-export interface IInstructionVisitor<Instructions> {
+export interface IInstructionVisitor {
     check(): boolean;
     handle(): void;
 }
 
-export type InstructionParserConstructor<Instructions, Context, Injection> = new (tokens: string[], startAt: number, astBuilder: IASTBuilder<Instructions, Injection>, injection: Injection) => IInstructionParser<Instructions, Context>;
+export type InstructionParserConstructor<Instructions, Context, Injection> = new (content: string, tokens: string[], startAt: number, astBuilder: IASTBuilder<Instructions, Injection>, injection: Injection) => IInstructionParser<Instructions, Context>;
 
-export type InstructionVisitorConstructor<Instructions, Injection> = new (astBuilder: IASTBuilder<Instructions, Injection>, injection: Injection) => IInstructionVisitor<Instructions>;
+export type InstructionVisitorConstructor<Instructions, Injection> = new (astBuilder: IASTBuilder<Instructions, Injection>, injection: Injection) => IInstructionVisitor;
 
 export type InstructionNode<Instructions, Context = undefined> = {
     identifier?: string;

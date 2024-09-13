@@ -5,7 +5,7 @@ export abstract class InstructionParser<Instructions, Context, Injection> implem
     limited: boolean = false;
     nextIndex: number;
 
-    constructor(protected tokens: string[], protected startAt: number, protected astBuilder: IASTBuilder<Instructions, Injection>, protected injection: Injection /* TODO Put injection in a proxy and allow to change it only by assignment to this.injection but without changing the internal fields individiaully */) {
+    constructor(protected content: string, protected tokens: string[], protected startAt: number, protected astBuilder: IASTBuilder<Instructions, Injection>, protected injection: Injection /* TODO Put injection in a proxy and allow to change it only by assignment to this.injection but without changing the internal fields individiaully */) {
         this.nextIndex = startAt;
     }
 
@@ -18,7 +18,7 @@ export abstract class InstructionParser<Instructions, Context, Injection> implem
     }
 
     protected nextChildren(limitNext?: Instructions[], stopAt?: Instructions[]): InstructionNode<Instructions, unknown>[] {
-        const children = this.astBuilder.createChildren(this.tokens, this.nextIndex + 1, this.injection, stopAt, limitNext);
+        const children = this.astBuilder.createChildren(this.content, this.tokens, this.nextIndex + 1, this.injection, stopAt, limitNext);
 
         if (children.length === 0) {
             return [];
@@ -30,14 +30,10 @@ export abstract class InstructionParser<Instructions, Context, Injection> implem
     }
 
     protected next(limitNext?: Instructions[]): InstructionNode<Instructions, unknown> | undefined {
-        try {
-            return this.nextChildren(limitNext)[0]; // TODO Make sure we catch only "no children" error
-        }
-        catch {
-            return;
-        }
+        return this.nextChildren(limitNext)[0];
     }
 
     abstract check(): boolean;
-    abstract handle(): ReturnedInstructionNode<Instructions, Context>;
+    abstract handle(): ReturnedInstructionNode<Instructions, Context>;    
+    abstract trace(cords: [number, number]): string;
 }

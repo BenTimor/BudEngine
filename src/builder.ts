@@ -1,16 +1,19 @@
 import { defaultsDeep } from "lodash";
-import { IASTBuilder, InstructionNode, InstructionParserConstructor, InstructionVisitorConstructor } from "./types";
+import { IASTBuilder, IInstructionParser, InstructionNode, InstructionParserConstructor, InstructionVisitorConstructor } from "./types";
+import { ChildError } from "./errors";
+import { addSpacesAroundMatches } from "./utils";
 
 type Options = {
     split: RegExp;
     skipEmpty: boolean;
+    spaceOut: string[];
 };
 
 const DefaultOptions: Options = {
-    split: /\s+/g,
+    split: /\s+/g, // TODO Either stop supporting this or integrate it into the errors and spaceOut correctly
     skipEmpty: true,
+    spaceOut: [],
 };
-
 
 export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instructions, Injection> {
     private options: Options;
@@ -25,20 +28,19 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
         return this.nodesIndex[identifier] ?? this.parent?.getNode(identifier);
     }
 
-    createChildren(tokens: string[], startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[]): InstructionNode<Instructions, unknown>[] {
+    createChildren(content: string, tokens: string[], startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[]): InstructionNode<Instructions, unknown>[] {
         const subASTBuilder = new ASTBuilder<Instructions, Injection>(this.instructions, this.visitors, inject, this.options, this);
 
         let index = startAt;
 
         while (true) {
-            const node = subASTBuilder.fromToken(tokens, index, inject, limit, [
+            const node = subASTBuilder.fromToken(content, tokens, index, inject, limit, [
                 ...(limit || []),
                 ...(stopAt || []),
             ]);
 
-            // No node and we didn't break yet? Then there's an error
-            if (!node) {                                
-                throw new Error("Syntax error");
+            if (!node) {
+                break;
             }
 
             index = node.endsAt + 1;
@@ -56,20 +58,70 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
 
         return subASTBuilder.nodes;
     }
-    
-    private visit(): void {
+
+    private visit(instructionInstance: IInstructionParser<Instructions, any>, content: string, tokenNumber: number, tokens: string[]): void {
         for (const visitorConstructor of this.visitors) {
             const visitor = new visitorConstructor(this as IASTBuilder<Instructions, Injection>, this.inject);
 
-            if (visitor.check()) {
-                visitor.handle();
+            if (this.handleError(() => visitor.check(), instructionInstance, content, tokenNumber, tokens)) {
+                this.handleError(() => visitor.handle(), instructionInstance, content, tokenNumber, tokens);
             }
         }
     }
 
-    private fromToken(tokens: string[], startAt: number, inject: Injection, limit?: Instructions[], allowedInstructions: Instructions[] = []): InstructionNode<Instructions, any> | undefined {
+    private handleError<T>(callback: () => T, instructionInstance: IInstructionParser<Instructions, any>, content: string, tokenNumber: number, tokens: string[]): T {
+        try {
+            return callback();
+        }
+        catch (error) {
+            if (error instanceof ChildError) {
+                const trace = instructionInstance.trace(this.getLineAndColumn(content, tokenNumber, tokens));
+                error.message += `\n${trace}`;
+                throw error;
+            }
+            else {
+                const trace = instructionInstance.trace(this.getLineAndColumn(content, tokenNumber, tokens));
+                throw new ChildError(`${error}\n${trace}`);
+            }
+        }
+    }
+
+    private getLineAndColumn(content: string, tokenNumber: number, tokens: string[]): [number, number] {
+        let line = 1;
+        let column = 1;
+        let currToken = 0;
+
+        for (let i = 0; i < content.length; i++) {
+            if (currToken > tokenNumber) {
+                break;
+            }
+
+            if (content[i] === "\n") {
+                line++;
+                column = 1;
+                continue;
+            }
+
+            if (tokens[currToken] === content.slice(i, i + tokens[currToken].length)) {
+                i += tokens[currToken].length - 1;
+                column += tokens[currToken].length;
+                currToken++;
+            }
+            else {
+                column++;
+            }
+        }
+
+        return [line, column - tokens[tokenNumber].length];
+    }
+
+    private fromToken(content: string, tokens: string[], startAt: number, inject: Injection, limit?: Instructions[], allowedInstructions: Instructions[] = []): InstructionNode<Instructions, any> | undefined {
+        if (startAt >= tokens.length) {
+            return undefined;
+        }
+
         for (const instructionConstructor of this.instructions) {
-            const instructionInstance = new instructionConstructor(tokens, startAt, this as IASTBuilder<Instructions, Injection>, inject);
+            const instructionInstance = new instructionConstructor(content, tokens, startAt, this as IASTBuilder<Instructions, Injection>, inject);
 
             if (limit && !limit.includes(instructionInstance.instruction)) {
                 continue;
@@ -79,10 +131,10 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
                 continue;
             }
 
-            if (instructionInstance.check()) {
+            if (this.handleError(() => instructionInstance.check(), instructionInstance, content, startAt, tokens)) {
                 instructionInstance.resetNextIndex();
 
-                const returnedNode = instructionInstance.handle() as any; // TODO I have no idea how to fix this type
+                const returnedNode = this.handleError(() => instructionInstance.handle(), instructionInstance, content, startAt, tokens) as any; // TODO I have no idea how to fix this type
 
                 const node: InstructionNode<Instructions, unknown> = {
                     ...returnedNode,
@@ -99,15 +151,15 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
 
                 this.nodes.push(node);
 
-                this.visit();
+                this.visit(instructionInstance, content, startAt, tokens);
 
                 return node;
             }
         }
     }
 
-    fromContent(content: string): InstructionNode<Instructions, unknown>[] {        
-        const tokens = content.split(this.options.split);
+    fromContent(content: string): InstructionNode<Instructions, unknown>[] {
+        const tokens = addSpacesAroundMatches(content, this.options.spaceOut).split(this.options.split);
 
         let i = 0;
 
@@ -117,7 +169,7 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
                 continue;
             }
 
-            const node = this.fromToken(tokens, i, this.inject);
+            const node = this.fromToken(content, tokens, i, this.inject);
 
             if (!node) {
                 throw new Error("Syntax error");
