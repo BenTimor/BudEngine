@@ -1,26 +1,38 @@
 import { defaultsDeep } from "lodash";
 import { IASTBuilder, IInstructionParser, InstructionNode, InstructionParserConstructor, InstructionVisitorConstructor } from "./types";
-import { ChildError } from "./errors";
+import { ChildError, DuplicateIdentifierError } from "./errors";
 import { addSpacesAroundMatches } from "./utils";
 
-type Options = {
+type DeepPartial<T> = T extends object ? {
+    [P in keyof T]?: DeepPartial<T[P]>;
+} : T;
+
+type Options<Instructions, Injection> = {
     split: RegExp;
     skipEmpty: boolean;
     spaceOut: string[];
+    errors: {
+        missingStopInstruction: (stopAt: Instructions[]) => Error;
+        instructionDoesntExist: (token: string, tokenIndex: number, tokens: string[], cords: number[], inject: Injection) => Error;
+    }
 };
 
-const DefaultOptions: Options = {
+const DefaultOptions: Options<unknown, unknown> = {
     split: /\s+/g, // TODO Either stop supporting this or integrate it into the errors and spaceOut correctly
     skipEmpty: true,
     spaceOut: [],
+    errors: {
+        missingStopInstruction: () => new Error(`Missing stop instruction`),
+        instructionDoesntExist: (token) => new Error(`Instruction ${token} doesn't exist.`),
+    }
 };
 
 export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instructions, Injection> {
-    private options: Options;
+    private options: Options<Instructions, Injection>;
     private nodesIndex: Record<string, InstructionNode<Instructions, unknown>> = {};
     public nodes: InstructionNode<Instructions, unknown>[] = [];
 
-    constructor(private instructions: (InstructionParserConstructor<Instructions, any, Injection>)[], private visitors: (InstructionVisitorConstructor<Instructions, Injection>)[], private inject: Injection, options?: Partial<Options>, private parent?: ASTBuilder<Instructions, Injection>) {
+    constructor(private instructions: (InstructionParserConstructor<Instructions, any, Injection>)[], private visitors: (InstructionVisitorConstructor<Instructions, Injection>)[], private inject: Injection, options?: DeepPartial<Options<Instructions, Injection>>, private parent?: ASTBuilder<Instructions, Injection>) {
         this.options = defaultsDeep(options || {}, DefaultOptions);
     }
 
@@ -28,7 +40,7 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
         return this.nodesIndex[identifier] ?? this.parent?.getNode(identifier);
     }
 
-    createChildren(content: string, tokens: string[], startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[]): InstructionNode<Instructions, unknown>[] {
+    createChildren(content: string, tokens: string[], startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[], missingStopError?: () => Error): InstructionNode<Instructions, unknown>[] {
         const subASTBuilder = new ASTBuilder<Instructions, Injection>(this.instructions, this.visitors, inject, this.options, this);
 
         let index = startAt;
@@ -41,7 +53,12 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
 
             if (!node) {
                 if (stopAt) {
-                    throw new Error("Syntax error");
+                    if (tokens[index]) {
+                        throw this.options.errors.instructionDoesntExist(tokens[index], index, tokens, this.getLineAndColumn(content, index, tokens), this.inject);
+                    }
+                    else {
+                        throw missingStopError ? missingStopError() : this.options.errors.missingStopInstruction(stopAt);
+                    }
                 }
                 else {
                     break;
@@ -148,7 +165,7 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
 
                 if (node.identifier) {
                     if (this.nodesIndex[node.identifier]) {
-                        throw new Error(`Node with identifier ${node.identifier} already exists`);
+                        throw new DuplicateIdentifierError(node.identifier);
                     }
 
                     this.nodesIndex[node.identifier] = node;
@@ -177,11 +194,7 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
             const node = this.fromToken(content, tokens, i, this.inject);
 
             if (!node) {
-                throw new Error("Syntax error");
-            }
-
-            if (node.endsAt === undefined) {
-                throw new Error("Syntax error");
+                throw this.options.errors.instructionDoesntExist(tokens[i], i, tokens, this.getLineAndColumn(content, i, tokens), this.inject);
             }
 
             i = node.endsAt + 1;
