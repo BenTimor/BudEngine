@@ -3,6 +3,7 @@ export interface IASTBuilder<Instructions, Injection> {
     fromContent(content: string): InstructionNode<Instructions, unknown>[];
     getNode(identifier: string): InstructionNode<Instructions, unknown> | undefined;
     createChildren(content: string, tokens: string[], startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[], missingStopError?: () => Error): InstructionNode<Instructions, unknown>[];
+    addNode(node: InstructionNode<Instructions, unknown>): void;
 }
 
 export interface IInstructionParser<Instructions, Context> {

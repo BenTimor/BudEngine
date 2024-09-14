@@ -40,6 +40,18 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
         return this.nodesIndex[identifier] ?? this.parent?.getNode(identifier);
     }
 
+    addNode(node: InstructionNode<Instructions, unknown>): void {
+        if (node.identifier) {
+            if (this.nodesIndex[node.identifier]) {
+                throw new DuplicateIdentifierError(node.identifier);
+            }
+
+            this.nodesIndex[node.identifier] = node;
+        }
+
+        this.nodes.push(node);
+    }
+
     createChildren(content: string, tokens: string[], startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[], missingStopError?: () => Error): InstructionNode<Instructions, unknown>[] {
         const subASTBuilder = new ASTBuilder<Instructions, Injection>(this.instructions, this.visitors, inject, this.options, this);
 
