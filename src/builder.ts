@@ -40,7 +40,12 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
             ]);
 
             if (!node) {
-                break;
+                if (stopAt) {
+                    throw new Error("Syntax error");
+                }
+                else {
+                    break;
+                }
             }
 
             index = node.endsAt + 1;
