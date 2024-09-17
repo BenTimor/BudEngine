@@ -1,11 +1,7 @@
 import { defaultsDeep } from "lodash";
 import { IASTBuilder, IInstructionParser, InstructionNode, InstructionParserConstructor, InstructionVisitorConstructor } from "./types";
 import { ChildError, DuplicateIdentifierError } from "./errors";
-import { addSpacesAroundMatches } from "./utils";
-
-type DeepPartial<T> = T extends object ? {
-    [P in keyof T]?: DeepPartial<T[P]>;
-} : T;
+import { addSpacesAroundMatches, DeepPartial } from "./utils";
 
 type Options<Instructions, Injection> = {
     split: RegExp;

@@ -18,3 +18,7 @@ export function addSpacesAroundMatches(content: string, stringList: string[]): s
     // Clean up extra spaces
     return content;
 }
+
+export type DeepPartial<T> = T extends object ? {
+    [P in keyof T]?: DeepPartial<T[P]>;
+} : T;
