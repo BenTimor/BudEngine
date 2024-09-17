@@ -17,8 +17,14 @@ export abstract class InstructionParser<Instructions, Context, Injection> implem
         this.nextIndex = this.startAt;
     }
 
-    protected nextChildren(limitNext?: Instructions[], stopAt?: Instructions[], missingStopError?: () => Error): InstructionNode<Instructions, unknown>[] {
-        const children = this.astBuilder.createChildren(this.content, this.tokens, this.nextIndex + 1, this.injection, stopAt, limitNext, missingStopError);
+    protected nextChildren(limitNext?: Instructions[], stopAt?: Instructions[], options?: {
+        missingStopError?: () => Error,
+        childrenPrefix?: InstructionNode<Instructions, unknown>[],
+    }): InstructionNode<Instructions, unknown>[] {
+        const children = this.astBuilder.createChildren(this.content, this.tokens, this.nextIndex + 1, this.injection, stopAt, limitNext, {
+            missingStopError: options?.missingStopError,
+            childrenPrefix: options?.childrenPrefix,
+        });
 
         if (children.length === 0) {
             return [];

@@ -2,7 +2,10 @@ export interface IASTBuilder<Instructions, Injection> {
     nodes: InstructionNode<Instructions, unknown>[];
     fromContent(content: string): InstructionNode<Instructions, unknown>[];
     getNode(identifier: string): InstructionNode<Instructions, unknown> | undefined;
-    createChildren(content: string, tokens: string[], startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[], missingStopError?: () => Error): InstructionNode<Instructions, unknown>[];
+    createChildren(content: string, tokens: string[], startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[], options?: {
+        missingStopError?: () => Error,
+        childrenPrefix?: InstructionNode<Instructions, unknown>[],
+    }): InstructionNode<Instructions, unknown>[];
     addNode(node: InstructionNode<Instructions, unknown>): void;
 }
 

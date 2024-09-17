@@ -48,8 +48,15 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
         this.nodes.push(node);
     }
 
-    createChildren(content: string, tokens: string[], startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[], missingStopError?: () => Error): InstructionNode<Instructions, unknown>[] {
+    createChildren(content: string, tokens: string[], startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[], options?: {
+        missingStopError?: () => Error,
+        childrenPrefix?: InstructionNode<Instructions, unknown>[],
+    }): InstructionNode<Instructions, unknown>[] {
         const subASTBuilder = new ASTBuilder<Instructions, Injection>(this.instructions, this.visitors, inject, this.options, this);
+
+        for (const child of options?.childrenPrefix || []) {
+            subASTBuilder.addNode(child);
+        }
 
         let index = startAt;
 
@@ -65,7 +72,7 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
                         throw this.options.errors.instructionDoesntExist(tokens[index], index, tokens, this.getLineAndColumn(content, index, tokens), this.inject);
                     }
                     else {
-                        throw missingStopError ? missingStopError() : this.options.errors.missingStopInstruction(stopAt);
+                        throw options?.missingStopError ? options?.missingStopError() : this.options.errors.missingStopInstruction(stopAt);
                     }
                 }
                 else {
