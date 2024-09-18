@@ -1,5 +1,5 @@
 import { defaultsDeep } from "lodash";
-import { IASTBuilder, IInstructionParser, InstructionNode, InstructionParserConstructor, InstructionVisitorConstructor } from "./types";
+import { IASTBuilder, InstructionNode, InstructionParserConstructor, InstructionVisitorConstructor, Traceable } from "./types";
 import { ChildError, DuplicateIdentifierError } from "./errors";
 import { addSpacesAroundMatches, DeepPartial } from "./utils";
 
@@ -26,10 +26,12 @@ const DefaultOptions: Options<unknown, unknown> = {
 export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instructions, Injection> {
     private options: Options<Instructions, Injection>;
     private nodesIndex: Record<string, InstructionNode<Instructions, unknown>> = {};
+    private tokens: string[];
     public nodes: InstructionNode<Instructions, unknown>[] = [];
 
-    constructor(private instructions: (InstructionParserConstructor<Instructions, any, Injection>)[], private visitors: (InstructionVisitorConstructor<Instructions, Injection>)[], private inject: Injection, options?: DeepPartial<Options<Instructions, Injection>>, private parent?: ASTBuilder<Instructions, Injection>) {
+    constructor(private content: string, private instructions: (InstructionParserConstructor<Instructions, any, Injection>)[], private visitors: (InstructionVisitorConstructor<Instructions, Injection>)[], private inject: Injection, options?: DeepPartial<Options<Instructions, Injection>>, public parent?: ASTBuilder<Instructions, Injection>) {
         this.options = defaultsDeep(options || {}, DefaultOptions);
+        this.tokens = addSpacesAroundMatches(content, this.options.spaceOut).split(this.options.split);
     }
 
     getNode(identifier: string): InstructionNode<Instructions, unknown> | undefined {
@@ -46,13 +48,15 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
         }
 
         this.nodes.push(node);
+
+        this.visit(node.endsAt);
     }
 
-    createChildren(content: string, tokens: string[], startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[], options?: {
+    createChildren(startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[], options?: {
         missingStopError?: () => Error,
         childrenPrefix?: InstructionNode<Instructions, unknown>[],
     }): InstructionNode<Instructions, unknown>[] {
-        const subASTBuilder = new ASTBuilder<Instructions, Injection>(this.instructions, this.visitors, inject, this.options, this);
+        const subASTBuilder = new ASTBuilder<Instructions, Injection>(this.content, this.instructions, this.visitors, inject, this.options, this);
 
         for (const child of options?.childrenPrefix || []) {
             subASTBuilder.addNode(child);
@@ -61,15 +65,15 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
         let index = startAt;
 
         while (true) {
-            const node = subASTBuilder.fromToken(content, tokens, index, inject, limit, [
+            const nodeData = subASTBuilder.fromToken(this.content, this.tokens, index, inject, limit, [
                 ...(limit || []),
                 ...(stopAt || []),
             ]);
 
-            if (!node) {
+            if (!nodeData) {
                 if (stopAt) {
-                    if (tokens[index]) {
-                        throw this.options.errors.instructionDoesntExist(tokens[index], index, tokens, this.getLineAndColumn(content, index, tokens), this.inject);
+                    if (this.tokens[index]) {
+                        throw this.options.errors.instructionDoesntExist(this.tokens[index], index, this.tokens, this.getLineAndColumn(index), this.inject);
                     }
                     else {
                         throw options?.missingStopError ? options?.missingStopError() : this.options.errors.missingStopInstruction(stopAt);
@@ -80,7 +84,9 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
                 }
             }
 
-            index = node.endsAt + 1;
+            const [endsAt, instruction] = nodeData;
+
+            index = endsAt + 1;
 
             // If there's no stopAt the loop runs only once
             if (!stopAt) {
@@ -88,7 +94,7 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
             }
 
             // If the node is in the stopAt array, we break
-            if (stopAt.includes(node.instruction)) {
+            if (stopAt.includes(instruction)) {
                 break;
             }
         }
@@ -96,52 +102,52 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
         return subASTBuilder.nodes;
     }
 
-    private visit(instructionInstance: IInstructionParser<Instructions, any>, content: string, tokenNumber: number, tokens: string[]): void {
+    private visit(tokenNumber: number): void {
         for (const visitorConstructor of this.visitors) {
             const visitor = new visitorConstructor(this as IASTBuilder<Instructions, Injection>, this.inject);
 
-            if (this.handleError(() => visitor.check(), instructionInstance, content, tokenNumber, tokens)) {
-                this.handleError(() => visitor.handle(), instructionInstance, content, tokenNumber, tokens);
+            if (this.handleError(() => visitor.check(), visitor, tokenNumber)) {
+                this.handleError(() => visitor.handle(), visitor, tokenNumber);
             }
         }
     }
 
-    private handleError<T>(callback: () => T, instructionInstance: IInstructionParser<Instructions, any>, content: string, tokenNumber: number, tokens: string[]): T {
+    private handleError<T>(callback: () => T, instructionInstance: Traceable, tokenNumber: number): T {
         try {
             return callback();
         }
         catch (error) {
             if (error instanceof ChildError) {
-                const trace = instructionInstance.trace(this.getLineAndColumn(content, tokenNumber, tokens));
+                const trace = instructionInstance.trace(this.getLineAndColumn(tokenNumber));
                 error.message += `\n${trace}`;
                 throw error;
             }
             else {
-                const trace = instructionInstance.trace(this.getLineAndColumn(content, tokenNumber, tokens));
+                const trace = instructionInstance.trace(this.getLineAndColumn(tokenNumber));
                 throw new ChildError(`${error}\n${trace}`);
             }
         }
     }
 
-    private getLineAndColumn(content: string, tokenNumber: number, tokens: string[]): [number, number] {
+    private getLineAndColumn(tokenNumber: number): [number, number] {
         let line = 1;
         let column = 1;
         let currToken = 0;
 
-        for (let i = 0; i < content.length; i++) {
+        for (let i = 0; i < this.content.length; i++) {
             if (currToken > tokenNumber) {
                 break;
             }
 
-            if (content[i] === "\n") {
+            if (this.content[i] === "\n") {
                 line++;
                 column = 1;
                 continue;
             }
 
-            if (tokens[currToken] === content.slice(i, i + tokens[currToken].length)) {
-                i += tokens[currToken].length - 1;
-                column += tokens[currToken].length;
+            if (this.tokens[currToken] === this.content.slice(i, i + this.tokens[currToken].length)) {
+                i += this.tokens[currToken].length - 1;
+                column += this.tokens[currToken].length;
                 currToken++;
             }
             else {
@@ -149,12 +155,12 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
             }
         }
 
-        return [line, column - tokens[tokenNumber].length];
+        return [line, column - this.tokens[tokenNumber].length];
     }
 
-    private fromToken(content: string, tokens: string[], startAt: number, inject: Injection, limit?: Instructions[], allowedInstructions: Instructions[] = []): InstructionNode<Instructions, any> | undefined {
+    private fromToken(content: string, tokens: string[], startAt: number, inject: Injection, limit?: Instructions[], allowedInstructions: Instructions[] = []): [number, Instructions] | undefined {
         if (startAt >= tokens.length) {
-            return undefined;
+            return;
         }
 
         for (const instructionConstructor of this.instructions) {
@@ -168,51 +174,40 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
                 continue;
             }
 
-            if (this.handleError(() => instructionInstance.check(), instructionInstance, content, startAt, tokens)) {
+            if (this.handleError(() => instructionInstance.check(), instructionInstance, startAt)) {
                 instructionInstance.resetNextIndex();
 
-                const returnedNode = this.handleError(() => instructionInstance.handle(), instructionInstance, content, startAt, tokens) as any; // TODO I have no idea how to fix this type
+                const returnedNode = this.handleError(() => instructionInstance.handle(), instructionInstance, startAt) as any; // TODO I have no idea how to fix this type
 
-                const node: InstructionNode<Instructions, unknown> = {
-                    ...returnedNode,
-                    endsAt: instructionInstance.nextIndex,
-                };
-
-                if (node.identifier) {
-                    if (this.nodesIndex[node.identifier]) {
-                        throw new DuplicateIdentifierError(node.identifier);
-                    }
-
-                    this.nodesIndex[node.identifier] = node;
+                if (returnedNode) {
+                    this.addNode({
+                        ...returnedNode,
+                        endsAt: instructionInstance.nextIndex,
+                    });
                 }
 
-                this.nodes.push(node);
-
-                this.visit(instructionInstance, content, startAt, tokens);
-
-                return node;
+                return [instructionInstance.nextIndex, instructionInstance.instruction];
             }
         }
     }
 
-    fromContent(content: string): InstructionNode<Instructions, unknown>[] {
-        const tokens = addSpacesAroundMatches(content, this.options.spaceOut).split(this.options.split);
+    build(): InstructionNode<Instructions, unknown>[] {
 
         let i = 0;
 
-        while (i < tokens.length) {
-            if (this.options.skipEmpty && !tokens[i]) {
+        while (i < this.tokens.length) {
+            if (this.options.skipEmpty && !this.tokens[i]) {
                 i++;
                 continue;
             }
 
-            const node = this.fromToken(content, tokens, i, this.inject);
+            const nodeData = this.fromToken(this.content, this.tokens, i, this.inject);
 
-            if (!node) {
-                throw this.options.errors.instructionDoesntExist(tokens[i], i, tokens, this.getLineAndColumn(content, i, tokens), this.inject);
+            if (!nodeData) {
+                throw this.options.errors.instructionDoesntExist(this.tokens[i], i, this.tokens, this.getLineAndColumn(i), this.inject);
             }
 
-            i = node.endsAt + 1;
+            i = nodeData[0] + 1;
         }
 
         return this.nodes;

@@ -5,4 +5,5 @@ export abstract class InstructionVisitor<Instructions, Injection> implements IIn
 
     abstract check(): boolean;
     abstract handle(): void;
+    abstract trace(cords: [number, number]): string;
 }

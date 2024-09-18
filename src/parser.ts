@@ -21,7 +21,7 @@ export abstract class InstructionParser<Instructions, Context, Injection> implem
         missingStopError?: () => Error,
         childrenPrefix?: InstructionNode<Instructions, unknown>[],
     }): InstructionNode<Instructions, unknown>[] {
-        const children = this.astBuilder.createChildren(this.content, this.tokens, this.nextIndex + 1, this.injection, stopAt, limitNext, {
+        const children = this.astBuilder.createChildren(this.nextIndex + 1, this.injection, stopAt, limitNext, {
             missingStopError: options?.missingStopError,
             childrenPrefix: options?.childrenPrefix,
         });
@@ -40,6 +40,6 @@ export abstract class InstructionParser<Instructions, Context, Injection> implem
     }
 
     abstract check(): boolean;
-    abstract handle(): ReturnedInstructionNode<Instructions, Context>;    
+    abstract handle(): ReturnedInstructionNode<Instructions, Context> | null;    
     abstract trace(cords: [number, number]): string;
 }

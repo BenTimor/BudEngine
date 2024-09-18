@@ -1,26 +1,30 @@
 export interface IASTBuilder<Instructions, Injection> {
     nodes: InstructionNode<Instructions, unknown>[];
-    fromContent(content: string): InstructionNode<Instructions, unknown>[];
+    parent?: IASTBuilder<Instructions, Injection>;
+    build(): InstructionNode<Instructions, unknown>[];
     getNode(identifier: string): InstructionNode<Instructions, unknown> | undefined;
-    createChildren(content: string, tokens: string[], startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[], options?: {
+    createChildren(startAt: number, inject: Injection, stopAt?: Instructions[], limit?: Instructions[], options?: {
         missingStopError?: () => Error,
         childrenPrefix?: InstructionNode<Instructions, unknown>[],
     }): InstructionNode<Instructions, unknown>[];
     addNode(node: InstructionNode<Instructions, unknown>): void;
 }
 
-export interface IInstructionParser<Instructions, Context> {
+export interface Traceable {
+    trace(cords: [number, number]): string;
+}
+
+export interface IInstructionParser<Instructions, Context> extends Traceable {
     instruction: Instructions;
     limited: boolean;
     nextIndex: number;
     arg: string; // TODO Rename to token
     resetNextIndex(): void;
     check(): boolean;
-    handle(): ReturnedInstructionNode<Instructions, Context>;
-    trace(cords: [number, number]): string;
+    handle(): ReturnedInstructionNode<Instructions, Context> | null;
 }
 
-export interface IInstructionVisitor {
+export interface IInstructionVisitor extends Traceable {
     check(): boolean;
     handle(): void;
 }
