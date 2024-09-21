@@ -8,6 +8,7 @@ export interface IASTBuilder<Instructions, Injection> {
         childrenPrefix?: InstructionNode<Instructions, unknown>[],
     }): InstructionNode<Instructions, unknown>[];
     addNode(node: InstructionNode<Instructions, unknown>): void;
+    getLineAndColumn(index: number): [number, number];
 }
 
 export interface Traceable {

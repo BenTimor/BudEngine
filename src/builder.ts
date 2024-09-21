@@ -129,7 +129,7 @@ export class ASTBuilder<Instructions, Injection> implements IASTBuilder<Instruct
         }
     }
 
-    private getLineAndColumn(tokenNumber: number): [number, number] {
+    public getLineAndColumn(tokenNumber: number): [number, number] {
         let line = 1;
         let column = 1;
         let currToken = 0;
