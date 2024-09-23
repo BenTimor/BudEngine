@@ -1,37 +1,17 @@
-import { defaultsDeep } from "lodash";
 import { IGenerator, IInstructionGenerator, InstructionGeneratorConstructor, InstructionNode } from "./types";
-import { DeepPartial } from "./utils";
-
-export interface GeneratorOptions {
-    generator: {
-        join: string;
-        prefix: string;
-        suffix: string;
-    };
-}
-
-const defaultOptions: GeneratorOptions = {
-    generator: {
-        join: "",
-        prefix: "",
-        suffix: "",
-    }
-};
 
 export class Generator implements IGenerator {
-    private options: GeneratorOptions;
 
-    constructor(private generators: InstructionGeneratorConstructor[], options?: DeepPartial<GeneratorOptions>) {
-        this.options = defaultsDeep(options, defaultOptions);
+    constructor(private generators: InstructionGeneratorConstructor[]) {
     }
 
-    async generate(nodes: InstructionNode<any, any>[]): Promise<string> {
-        return this.options.generator.prefix + (await Promise.all(nodes.map(async node => {
+    async generateMany(nodes: InstructionNode<any, any>[]): Promise<string[]> {
+        return (await Promise.all(nodes.map(async node => {
             return await this.generateOne(node);
-        }))).join(this.options.generator.join) + this.options.generator.suffix;
+        }))).filter(v => typeof v === "string") as string[];
     }
 
-    async generateOne(node: InstructionNode<any, any>): Promise<string> {
+    async generateOne(node: InstructionNode<any, any>): Promise<string | null> {
         for (const generatorConst of this.generators) {
             const generator = new generatorConst(this);
 
@@ -48,5 +28,5 @@ export abstract class InstructionGenerator<InternalInstructionNode extends Instr
     constructor(protected generator: IGenerator) { }
 
     abstract check(node: InternalInstructionNode): Promise<boolean>;
-    abstract handle(node: InternalInstructionNode): Promise<string>;
+    abstract handle(node: InternalInstructionNode): Promise<string | null>;
 }

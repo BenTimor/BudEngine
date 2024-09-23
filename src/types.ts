@@ -43,13 +43,13 @@ export type InstructionNode<Instructions, Context = undefined> = {
 export type ReturnedInstructionNode<Instructions, Context = undefined> = Omit<InstructionNode<Instructions, Context>, "endsAt">;
 
 export interface IGenerator {
-    generate(nodes: InstructionNode<any, any>[]): Promise<string>;
-    generateOne(node: InstructionNode<any, any>): Promise<string>;
+    generateMany(nodes: InstructionNode<any, any>[]): Promise<string[]>;
+    generateOne(node: InstructionNode<any, any>): Promise<string | null>;
 }
 
 export interface IInstructionGenerator {
     check(node: InstructionNode<any>): Promise<boolean>;
-    handle(node: InstructionNode<any>): Promise<string>;
+    handle(node: InstructionNode<any>): Promise<string | null>;
 }
 
 export type InstructionGeneratorConstructor = new (generator: IGenerator) => IInstructionGenerator;
